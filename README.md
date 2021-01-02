@@ -8,6 +8,17 @@ A Windows 10 utility that lets you select a folder, preview images, and order th
 
 ### How to use
 
+#### First run
+
+* On first run, you may see a dialog with...
+    * Windows protected your PC -- Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
+* Click the "More info" link.
+* Click "Run anyway".
+    * Often this would be a bad idea. 
+    * It's okay here, I *swear*, but if you're sus, you can just [grab the source](https://github.com/ruffin--/openPhotoSorter), vet it, and build.
+
+#### Subsequent runs
+
 1. Open the app.
 2. Click the "Select Folder" button.
 3. The folder selection dialog is kinda weird. Navigate to the folder that has your images. Click "Save".
