@@ -1,2 +1,4 @@
 PhotoSorter/obj/
 .vs/
+*.swp
+dist/updateIt.bat

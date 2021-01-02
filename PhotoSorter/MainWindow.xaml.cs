@@ -47,7 +47,7 @@ namespace PhotoSorter
 
             foreach (string filePath in files)
             {
-                if (imageExtensions.Any(x => filePath.EndsWith(x)))
+                if (imageExtensions.Any(x => filePath.ToLower().EndsWith(x)))
                 {
                     System.Diagnostics.Debug.WriteLine(filePath);
 
