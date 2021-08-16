@@ -4,11 +4,13 @@
 
 using PhotoSorter.Models;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace PhotoSorter
 {
@@ -17,14 +19,14 @@ namespace PhotoSorter
     /// </summary>
     public partial class MainWindow : Window
     {
-        // public AnFolder HomeFolder = new AnFolder(@"C:\temp");
+        public AnFolder HomeFolder;
 
-        public AnFolder HomeFolder = new AnFolder(@"C:\");
-        private AnFolder currentFolder = new AnFolder();
-        private AnImage currentImage = null;
-        private AnImage lastImage = null;
+        private AnImage _currentImage = null;
+        private AnImage _lastImage = null;
+        private BitmapImage _currentImageAsBitmap;
 
-        private string[] imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+        private Dictionary<string, AnImage> _imagesByHash = new Dictionary<string, AnImage>();
+        private Dictionary<string, Queue<AnImage>> _dupedImagesByHash = new Dictionary<string, Queue<AnImage>>();
 
         public MainWindow()
         {
@@ -37,47 +39,20 @@ namespace PhotoSorter
 
         private void RefreshUI()
         {
-            var source = currentFolder.ImagesByHash.SelectMany(x => x.Value);
+            IEnumerable<AnImage> source = this.HomeFolder.ImagesByPath.Values;
             this.lstImages.ItemsSource = this.lstImages.ItemsSource = source;
         }
 
-        private void loadFolder(AnFolder folder)
+        // Called after a folder is selected.
+        private void LoadFolder2(string path)
         {
-            var files = Directory.GetFiles(folder.Path);
-
-            foreach (string filePath in files)
-            {
-                if (imageExtensions.Any(x => filePath.ToLower().EndsWith(x)))
-                {
-                    System.Diagnostics.Debug.WriteLine(filePath);
-
-                    var anImage = new AnImage(filePath);
-
-                    if (!folder.ImagesByHash.ContainsKey(anImage.Hash))
-                    {
-                        folder.ImagesByHash.Add(anImage.Hash, new System.Collections.Generic.List<AnImage>());
-                    }
-
-                    folder.ImagesByHash[anImage.Hash].Add(anImage);
-                }
-            }
-
-            var folders = Directory.GetDirectories(folder.Path);
-
-            foreach (string folderPath in folders)
-            {
-                folder.ChildFolders.Add(new AnFolder(folderPath));
-            }
-
-            this.currentFolder = HomeFolder;
-            RefreshUI();
         }
 
         private void btnSelectFolder_Click(object sender, RoutedEventArgs e)
         {
             // Create a "Save As" dialog for selecting a directory (HACK)
             var dialog = new Microsoft.Win32.SaveFileDialog();
-            dialog.InitialDirectory = this.HomeFolder.Path; // Use current value for initial dir
+            dialog.InitialDirectory = this.HomeFolder?.Path ?? @"C:\"; // Use current value for initial dir
             dialog.Title = "Select a Directory"; // instead of default "Save As"
             dialog.Filter = "Directory|*.this.directory"; // Prevents displaying files
             dialog.FileName = "select"; // Filename will then be "select.this.directory"
@@ -88,15 +63,15 @@ namespace PhotoSorter
                 path = path.Replace("\\select.this.directory", "");
                 path = path.Replace(".this.directory", "");
                 // If user has changed the filename, create the new directory
-                if (!System.IO.Directory.Exists(path))
+                if (!Directory.Exists(path))
                 {
-                    System.IO.Directory.CreateDirectory(path);
+                    Directory.CreateDirectory(path);
                 }
 
-                this.HomeFolder.Path = path;
                 this.lblCurrentFolder.Content = path;
 
-                this.loadFolder(this.HomeFolder);
+                this.HomeFolder = new AnFolder(path);
+                RefreshUI();
             }
         }
 
@@ -104,12 +79,50 @@ namespace PhotoSorter
         {
             if (lstImages.SelectedItem != null)
             {
-                this.currentImage = (lstImages.SelectedItem as AnImage);
-                this.viewNew.Source = this.currentImage.Image;
-                this.lblCurrFiledState.Content = this.currentImage.Sorted
-                    ? $"Image has been sorted to {this.currentImage.SortVal}. Press 0-9 to copy again."
+                _currentImage = (lstImages.SelectedItem as AnImage);
+
+                Uri fileUri = new Uri(_currentImage.Path);
+                _currentImageAsBitmap = new BitmapImage(fileUri);
+                this.viewNew.Source = _currentImageAsBitmap;
+
+                AnImage alredayExists;
+                var hash = _currentImage.Hash;
+
+                if (_imagesByHash.TryGetValue(hash, out alredayExists))
+                {
+                    if (!alredayExists.Path.Equals(_currentImage.Path))
+                    {
+                        // then we have a duplicated image. If it's our first dupe,
+                        // we'll need to initialize the dupe queue for that hash.
+                        Queue<AnImage> existingDupes;
+                        if (!_dupedImagesByHash.TryGetValue(hash, out existingDupes))
+                        {
+                            existingDupes = new Queue<AnImage>();
+                            existingDupes.Enqueue(alredayExists); // add the first instance that's now duped.
+                            _dupedImagesByHash.Add(hash, existingDupes);
+                        }
+
+                        existingDupes.Enqueue(_currentImage);
+
+                        _showDupeDialog(
+                            alredayExists.Path,
+                            _currentImage.Path,
+                            existingDupes.Count()-1);
+
+                    }
+
+                    // else it's the same one we've already seen with this hash again.
+                    // carry on; nothing to add to the dictionary.
+                }
+                else
+                {
+                    _imagesByHash.Add(hash, _currentImage);
+                }
+
+                this.lblCurrFiledState.Content = this._currentImage.Sorted
+                    ? $"Image has been sorted to {this._currentImage.SortVal}. Press 0-9 to place an additional copy into a folder."
                     : "UNFILED. Choose folder for image, 0 through 9.";
-                this.lblCurrFiledState.Foreground = this.currentImage.Sorted
+                this.lblCurrFiledState.Foreground = this._currentImage.Sorted
                     ? Brushes.Red
                     : Brushes.Black;
             }
@@ -156,6 +169,22 @@ namespace PhotoSorter
             }
         }
 
+        private void _showDupeDialog(string first, string second, int count)
+        {
+            MessageBoxResult result = MessageBox.Show($@"This file was already seen in another location.
+
+First:
+    {first}
+Current:
+    {second}
+
+Extra copies of the same image: {count}
+",
+                                          "Duplicate Image",
+                                          MessageBoxButton.OK,
+                                          MessageBoxImage.Question);
+        }
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
@@ -189,13 +218,13 @@ namespace PhotoSorter
                 case Key.D9:
                     System.Diagnostics.Debug.WriteLine(e.Key);
 
-                    if (this.currentImage != null)
+                    if (this._currentImage != null)
                     {
                         var folderNum = (int)e.Key - 34;
-                        _copyImage(this.currentImage, folderNum);
+                        _copyImage(this._currentImage, folderNum);
 
-                        this.lastImage = this.currentImage;
-                        this.viewOld.Source = this.lastImage.Image;
+                        this._lastImage = this._currentImage;
+                        this.viewOld.Source = _currentImageAsBitmap;
                         this.lblPrevFolderNum.Content = $"{folderNum}";
 
                         this.lstImages.SelectedIndex++;

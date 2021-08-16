@@ -8,7 +8,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:PhotoSorter"
     mc:Ignorable="d"
-    Title="Open Photo Sorter v0.0.2a (c) 2020 -- USE AT YOUR OWN RISK!!!" Height="800" Width="1200"
+    Title="Open Photo Sorter v0.0.3a (c) 2020-1 -- USE AT YOUR OWN RISK!!!" Height="800" Width="1200"
     KeyDown="Window_KeyDown"
 >
     <Grid>

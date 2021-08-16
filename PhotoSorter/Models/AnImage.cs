@@ -4,7 +4,6 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
-using System.Windows.Media.Imaging;
 
 namespace PhotoSorter.Models
 {
@@ -27,13 +26,11 @@ namespace PhotoSorter.Models
 
         public string Path { get; set; }
 
-        private string _hash = null;
-
         public string Hash
         {
             get
             {
-                return _hash;
+                return HashFile(Path);
             }
         }
         public int SortVal { get; set; } = -1;
@@ -42,15 +39,6 @@ namespace PhotoSorter.Models
             get
             {
                 return SortVal >= 0 && SortVal <= 9;
-            }
-        }
-
-        private BitmapImage _image;
-        public BitmapImage Image
-        {
-            get
-            {
-                return _image;
             }
         }
 
@@ -67,11 +55,10 @@ namespace PhotoSorter.Models
         public AnImage(string path)
         {
             this.Path = path;
-            Uri fileUri = new Uri(path);
-            _image = new BitmapImage(fileUri);
 
             // TODO: There's probably a smarter way to do this using the BitmapImage to get a stream.
-            _hash = AnImage.HashFile(path);
+            // You are correct. Don't do this until you need to. That's a lot of resources, duh.
+            // _hash = AnImage.HashFile(path);
         }
     }
 }
