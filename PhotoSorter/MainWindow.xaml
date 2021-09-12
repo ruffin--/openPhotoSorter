@@ -39,8 +39,8 @@
             Grid.Row="1"
             Grid.Column="0"
         >
-            <Label>Prev image name: </Label>
-            <Label Name="imgPrev"></Label>
+            <Label>Last FILED image name: </Label>
+            <Label Name="lblImgPrev">(none yet)</Label>
         </StackPanel>
 
 
@@ -81,19 +81,24 @@
 <!-- ===================================================== -->
 
 
-<!-- Column 1 -->
+        <!-- Column 1 -->
         <StackPanel
             Orientation="Horizontal"
             Grid.Row="0"
             Grid.Column="1"
-            >
+        >
             <Label>Current Folder:</Label>
             <Label Name="lblCurrentFolder"></Label>
         </StackPanel>
-        <Label
+
+        <StackPanel
             Grid.Row="1"
             Grid.Column="1"
-        >Image name</Label>
+            Orientation="Horizontal"
+        >
+            <Label>Image name</Label>
+            <Label Name="lblImageName">(none yet)</Label>
+        </StackPanel>
 
         <Image
             Name="viewNew"

@@ -24,6 +24,8 @@ namespace PhotoSorter
         private AnImage _currentImage = null;
         private AnImage _lastImage = null;
         private BitmapImage _currentImageAsBitmap;
+        private readonly string _dateTimeFormat = "yyyyMMdd_HHmmssfff";
+        private string _folderSelectionSuffix = string.Empty;
 
         private Dictionary<string, AnImage> _imagesByHash = new Dictionary<string, AnImage>();
         private Dictionary<string, Queue<AnImage>> _dupedImagesByHash = new Dictionary<string, Queue<AnImage>>();
@@ -40,12 +42,8 @@ namespace PhotoSorter
         private void RefreshUI()
         {
             IEnumerable<AnImage> source = this.HomeFolder.ImagesByPath.Values;
-            this.lstImages.ItemsSource = this.lstImages.ItemsSource = source;
-        }
-
-        // Called after a folder is selected.
-        private void LoadFolder2(string path)
-        {
+            // this.lstImages.ItemsSource = this.lstImages.ItemsSource = source;
+            this.lstImages.ItemsSource = source;
         }
 
         private void btnSelectFolder_Click(object sender, RoutedEventArgs e)
@@ -62,6 +60,7 @@ namespace PhotoSorter
                 // Remove fake filename from resulting path
                 path = path.Replace("\\select.this.directory", "");
                 path = path.Replace(".this.directory", "");
+
                 // If user has changed the filename, create the new directory
                 if (!Directory.Exists(path))
                 {
@@ -71,6 +70,7 @@ namespace PhotoSorter
                 this.lblCurrentFolder.Content = path;
 
                 this.HomeFolder = new AnFolder(path);
+                _folderSelectionSuffix = DateTime.Now.ToString(_dateTimeFormat);
                 RefreshUI();
             }
         }
@@ -80,6 +80,7 @@ namespace PhotoSorter
             if (lstImages.SelectedItem != null)
             {
                 _currentImage = (lstImages.SelectedItem as AnImage);
+                lblImageName.Content = _currentImage.ImageName;
 
                 Uri fileUri = new Uri(_currentImage.Path);
                 _currentImageAsBitmap = new BitmapImage(fileUri);
@@ -92,9 +93,14 @@ namespace PhotoSorter
                 {
                     if (!alredayExists.Path.Equals(_currentImage.Path))
                     {
-                        // then we have a duplicated image. If it's our first dupe,
-                        // we'll need to initialize the dupe queue for that hash.
+                        // then we have a duplicated image.
+                        // Three situations are possible...
+                        // 1. It's our first dupe, period.
+                        // 2. It's not our first dupe, but it's our first time seeing the dupe with this path
+                        // 3. It's not our first dupe, and it's NOT our first time seeing this dupe with this path
                         Queue<AnImage> existingDupes;
+
+                        // 1. It's our first dupe, period.
                         if (!_dupedImagesByHash.TryGetValue(hash, out existingDupes))
                         {
                             existingDupes = new Queue<AnImage>();
@@ -102,13 +108,17 @@ namespace PhotoSorter
                             _dupedImagesByHash.Add(hash, existingDupes);
                         }
 
-                        existingDupes.Enqueue(_currentImage);
+                        if (!existingDupes.Contains(_currentImage))
+                        {
+                            // 1. --OR--
+                            // 2. It's not our first dupe, but it's our first time seeing the dupe with this path
+                            existingDupes.Enqueue(_currentImage);
+                        }
 
                         _showDupeDialog(
                             alredayExists.Path,
                             _currentImage.Path,
                             existingDupes.Count()-1);
-
                     }
 
                     // else it's the same one we've already seen with this hash again.
@@ -119,13 +129,18 @@ namespace PhotoSorter
                     _imagesByHash.Add(hash, _currentImage);
                 }
 
-                this.lblCurrFiledState.Content = this._currentImage.Sorted
-                    ? $"Image has been sorted to {this._currentImage.SortVal}. Press 0-9 to place an additional copy into a folder."
-                    : "UNFILED. Choose folder for image, 0 through 9.";
-                this.lblCurrFiledState.Foreground = this._currentImage.Sorted
-                    ? Brushes.Red
-                    : Brushes.Black;
+                _handleSortedImage();
             }
+        }
+
+        private void _handleSortedImage()
+        {
+            this.lblCurrFiledState.Content = this._currentImage.Sorted
+                ? $"Image has been sorted to {this._currentImage.SortVal}. Press 0-9 to place an additional copy into a folder."
+                : "UNFILED. Choose folder for image, 0 through 9.";
+            this.lblCurrFiledState.Foreground = this._currentImage.Sorted
+                ? Brushes.Red
+                : Brushes.Black;
         }
 
         private void _copyImage(AnImage image, int folderNum)
@@ -133,7 +148,11 @@ namespace PhotoSorter
             if (image != null)
             {
                 var numAsString = folderNum.ToString();
-                var folderDir = Path.Combine(this.HomeFolder.Path, "OpenPhotoSorter", numAsString);
+                var folderDir = Path.Combine(
+                    this.HomeFolder.Path,
+                    $"OpenPhotoSorter{_folderSelectionSuffix}",
+                    numAsString
+                );
                 Directory.CreateDirectory(folderDir);
 
                 // Recall that we've already limited to only dealing with files with image extensions.
@@ -144,7 +163,7 @@ namespace PhotoSorter
                 var newLoc = Path.Combine(folderDir, image.ImageName);
                 if (File.Exists(newLoc))
                 {
-                    var timeSuffix = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
+                    var timeSuffix = DateTime.Now.ToString(_dateTimeFormat);
                     newLoc = Path.Combine(folderDir, $"{nameBeforeExtension}_{timeSuffix}.{extension}");
 
                     // Really shouldn't happen often at all. Horn of a rabbit thing.
@@ -216,16 +235,16 @@ Extra copies of the same image: {count}
                 case Key.D7:
                 case Key.D8:
                 case Key.D9:
-                    System.Diagnostics.Debug.WriteLine(e.Key);
-
                     if (this._currentImage != null)
                     {
                         var folderNum = (int)e.Key - 34;
                         _copyImage(this._currentImage, folderNum);
 
-                        this._lastImage = this._currentImage;
+                        _lastImage = _currentImage;
                         this.viewOld.Source = _currentImageAsBitmap;
                         this.lblPrevFolderNum.Content = $"{folderNum}";
+                        _handleSortedImage();
+                        lblImgPrev.Content = _lastImage.ImageName;
 
                         this.lstImages.SelectedIndex++;
                     }

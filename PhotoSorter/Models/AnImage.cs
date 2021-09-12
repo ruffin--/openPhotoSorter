@@ -60,5 +60,22 @@ namespace PhotoSorter.Models
             // You are correct. Don't do this until you need to. That's a lot of resources, duh.
             // _hash = AnImage.HashFile(path);
         }
+
+        public override bool Equals(object obj)
+        {
+            if (obj.GetType() != typeof(AnImage))
+            {
+                return false;
+            }
+
+            AnImage objAsType = (AnImage)obj;
+
+            return objAsType.Path.Equals(this.Path);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
     }
 }
